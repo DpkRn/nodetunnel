@@ -1,0 +1,60 @@
+{
+  "name": "@dpkrn/nodetunnel",
+  "version": "1.0.2",
+  "description": "Expose a local HTTP server through a devtunnel/gotunnel-compatible server (yamux + JSON). Node.js 18+.",
+  "keywords": [
+    "tunnel",
+    "ngrok",
+    "yamux",
+    "devtunnel",
+    "gotunnel",
+    "localhost",
+    "expose",
+    "http",
+    "multiplex"
+  ],
+  "homepage": "https://github.com/DpkRn/NGROK/tree/main/nodetunnel#readme",
+  "bugs": {
+    "url": "https://github.com/DpkRn/NGROK/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DpkRn/NGROK.git",
+    "directory": "nodetunnel"
+  },
+  "license": "MIT",
+  "author": "DpkRn (https://github.com/DpkRn)",
+  "type": "module",
+  "main": "./pkg/tunnel/tunnel.js",
+  "exports": {
+    ".": {
+      "import": "./pkg/tunnel/tunnel.js",
+      "default": "./pkg/tunnel/tunnel.js"
+    },
+    "./pkg/tunnel": "./pkg/tunnel/tunnel.js",
+    "./pkg/tunnel/tunnel.js": "./pkg/tunnel/tunnel.js"
+  },
+  "files": [
+    "pkg",
+    "internal",
+    "cmd",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test-lib": "node cmd/test-lib/main.js",
+    "prepublishOnly": "node -e \"import('./pkg/tunnel/tunnel.js').then(() => console.log('pack ok')).catch(e => { console.error(e); process.exit(1); })\""
+  },
+  "dependencies": {
+    "yamux-js": "^0.2.0"
+  },
+  "devDependencies": {
+    "express": "^5.2.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
