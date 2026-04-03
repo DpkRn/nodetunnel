@@ -13,13 +13,13 @@
     "http",
     "multiplex"
   ],
-  "homepage": "https://github.com/DpkRn/NGROK/tree/main/nodetunnel#readme",
+  "homepage": "https://github.com/DpkRn/nodetunnel#readme",
   "bugs": {
-    "url": "https://github.com/DpkRn/NGROK/issues"
+    "url": "https://github.com/DpkRn/nodetunnel/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DpkRn/NGROK.git",
+    "url": "git+https://github.com/DpkRn/nodetunnel.git",
     "directory": "nodetunnel"
   },
   "license": "MIT",
