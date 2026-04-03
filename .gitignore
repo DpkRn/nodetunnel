@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# npm
+npm-debug.log*
+npm-error.log*
+.npm
+*.tgz
+.yarn-integrity
+
+# Environment (secrets — optional if you use dotenv)
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+logs/
+*.log
+tmp/
+temp/
+.cache/
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Build outputs (if you add a build step later)
+dist/
+build/
+*.tsbuildinfo
+
+# IDE (uncomment if you don’t want these in the repo)
+# .idea/
+# .vscode/

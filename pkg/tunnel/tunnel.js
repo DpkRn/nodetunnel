@@ -1,0 +1,40 @@
+'use strict';
+
+/**
+ * Public API: expose a local HTTP server through a gotunnel-compatible tunnel server.
+ *
+ * @example
+ * import http from 'node:http';
+ * import { startTunnel } from '@dpkrn/nodetunnel';
+ *
+ * const server = http.createServer((req, res) => {
+ *   res.end('ok');
+ * });
+ * server.listen(8080, async () => {
+ *   const { url, stop } = await startTunnel('8080');
+ *   console.log('Public URL:', url);
+ *   process.on('SIGINT', () => { stop(); process.exit(0); });
+ * });
+ */
+
+import { newTunnel } from '../../internal/tunnel/tunnel.js';
+
+/**
+ * Connect to the tunnel server and forward public HTTP traffic to localhost:&lt;port&gt;.
+ *
+ * @param {string} port local port (e.g. "8080")
+ * @param {{ host?: string, serverPort?: number }} [options] tunnel server (default localhost:9000)
+ * @returns {Promise<{ url: string, stop: () => void }>}
+ */
+async function startTunnel(port, options) {
+  const tunnel = await newTunnel(String(port), options);
+
+  console.log('✅Public url:', tunnel.getPublicUrl());
+
+  return {
+    url: tunnel.getPublicUrl(),
+    stop: () => tunnel.stop(),
+  };
+}
+
+export { startTunnel };

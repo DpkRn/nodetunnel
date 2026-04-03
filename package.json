@@ -1,6 +1,6 @@
 {
   "name": "@dpkrn/nodetunnel",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Expose a local HTTP server through a devtunnel/gotunnel-compatible server (yamux + JSON). Node.js 18+.",
   "keywords": [
     "tunnel",
@@ -49,6 +49,7 @@
     "prepublishOnly": "node -e \"import('./pkg/tunnel/tunnel.js').then(() => console.log('pack ok')).catch(e => { console.error(e); process.exit(1); })\""
   },
   "dependencies": {
+    "@dpkrn/nodetunnel": "^1.0.2",
     "yamux-js": "^0.2.0"
   },
   "devDependencies": {
