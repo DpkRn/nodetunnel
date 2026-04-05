@@ -181,7 +181,7 @@ class Tunnel {
     });
 
     const { line, remainder } = await readPublicUrlLine(socket);
-    this.publicUrl = `http://${line}`;
+    this.publicUrl = `${line}`;
 
     const session = new Session(true, defaultMuxConfig, (stream) => {
       handleStream(stream, this.localPort);
