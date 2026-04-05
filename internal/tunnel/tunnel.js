@@ -155,7 +155,7 @@ class Tunnel {
    */
   constructor(localPort, options = {}) {
     this.localPort = localPort;
-    this.serverHost = options.host ?? 'localhost';
+    this.serverHost = options.host ?? 'clickly.cv';
     this.serverPort = options.serverPort ?? 9000;
     /** @type {import('net').Socket | null} */
     this.socket = null;
