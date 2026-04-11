@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { Session } from 'yamux-js/lib/session.js';
+// import { version } from '../../../package.json' with { type: 'json' };
 
 const defaultMuxConfig = {
   enableKeepAlive: false,
@@ -179,6 +181,14 @@ class Tunnel {
       socket.once('connect', resolve);
       socket.once('error', reject);
     });
+
+    // Client hello (JSON line). Match Go json.Marshal(ClientHello) with exported fields (PascalCase).
+    socket.write(JSON.stringify({
+      tunnel_type: 'nodetunnel',
+      Version: "1.0.7",
+      tunnel_id: 'fixed_id',
+      connection_id: "conn_"+randomUUID(),
+    }) + '\n');
 
     const { line, remainder } = await readPublicUrlLine(socket);
     this.publicUrl = `${line}`;

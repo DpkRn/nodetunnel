@@ -32,7 +32,9 @@ coverage/
 dist/
 build/
 *.tsbuildinfo
+commands.md
 
 # IDE (uncomment if you don’t want these in the repo)
 # .idea/
 # .vscode/
+

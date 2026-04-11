@@ -20,7 +20,26 @@
 import { newTunnel } from '../../internal/tunnel/tunnel.js';
 
 /**
- * Connect to the tunnel server and forward public HTTP traffic to localhost:&lt;port&gt;.
+ * Print a formatted success message for the tunnel.
+ * @param {string} publicURL
+ * @param {string} localURL
+ */
+function printSuccess(publicURL, localURL) {
+  console.log();
+  console.log('  ╔══════════════════════════════════════════════════╗');
+  console.log('  ║  🚇  nodetunnel — tunnel is live                 ║');
+  console.log('  ╠══════════════════════════════════════════════════╣');
+  console.log(`  ║  🌍  Public   →  ${publicURL.padEnd(32)}║`);
+  console.log(`  ║  💻  Local    →  ${localURL.padEnd(32)}║`);
+  console.log(`  ╠══════════════════════════════════════════════════╣`);
+  console.log('  ║  ⚡  Forwarding requests...                      ║');
+  console.log('  ║  🛑  Press Ctrl+C to stop                        ║');
+  console.log('  ╚══════════════════════════════════════════════════╝');
+  console.log();
+}
+
+/**
+ * Connect to the tunnel server and forward public HTTP traffic to localhost:<port>.
  *
  * @param {string} port local port (e.g. "8080")
  * @param {{ host?: string, serverPort?: number }} [options] tunnel server (default localhost:9000)
@@ -29,10 +48,12 @@ import { newTunnel } from '../../internal/tunnel/tunnel.js';
 async function startTunnel(port, options) {
   const tunnel = await newTunnel(String(port), options);
 
-  console.log('✅Public url:', tunnel.getPublicUrl());
+  const publicURL = tunnel.getPublicUrl();
+  const localURL = `http://localhost:${port}`;
+  printSuccess(publicURL, localURL);
 
   return {
-    url: tunnel.getPublicUrl(),
+    url: publicURL,
     stop: () => tunnel.stop(),
   };
 }

@@ -28,10 +28,8 @@ app.get("/", async (req, res) => {
 
 app.listen(PORT, async () => {
   console.log(`listening on http://127.0.0.1:${PORT}`);
-  console.log("Leave this terminal open; press Ctrl+C to stop.");
   try {
     const { url, stop } = await startTunnel(String(PORT));
-    console.log("🌍 Public URL:", url);
     process.once("SIGINT", () => {
       stop();
       process.exit(0);
