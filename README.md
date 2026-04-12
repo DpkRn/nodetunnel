@@ -1,6 +1,37 @@
 # @dpkrn/nodetunnel
 
-Give your **local** HTTP server a **public URL** from Node.js — useful for webhooks, demos, sharing a dev server, or testing from another device.
+Package **nodetunnel** exposes a local HTTP server on a public URL by establishing a persistent outbound TCP connection to a tunnel server.
+
+It creates an outbound connection to a tunnel server and forwards incoming requests to your local application (e.g., `localhost:8080`).
+
+From **Node.js**, you get a **public URL** for webhooks, demos, sharing a dev server, or testing from another device — without a separate tunnel daemon.
+
+## Introduction
+
+### Benefits
+
+- Sharing your local server with others
+- Testing webhooks (Stripe, GitHub, etc.)
+- Remote debugging without deployment
+- No port forwarding or firewall configuration needed
+- Works behind NAT or private networks
+- Simple integration with existing Node.js HTTP servers (Express, Fastify, plain `http`, etc.)
+- Traffic inspector: capture traffic, replay, and modify requests as many times as you need
+
+Incoming traffic reaches the public URL, is forwarded through the tunnel, and is proxied to your local HTTP server (e.g., `localhost:8080`).
+
+This enables exposing local development servers without port forwarding, firewall changes, or public hosting.
+
+### Requirements
+
+- **Node.js 18+**
+- A **tunnel server** must be running and reachable (configure `host` / `serverPort` — see **Options** under [API](#api) below).
+- The port passed to `startTunnel` must match your local HTTP server port.
+- Your local server must be running **before** or **concurrently** with `startTunnel`.
+
+## Overview
+
+**nodetunnel** exposes a local HTTP server on a public URL by connecting to a tunnel server you run separately. Traffic hits the tunnel first, then your app on `localhost`.
 
 ---
 
@@ -10,14 +41,6 @@ Give your **local** HTTP server a **public URL** from Node.js — useful for web
 - **Works with your existing server** — Express, Fastify, or plain `http`.
 - **Simple API** — you get a public `url` and a `stop()` when you are done.
 - **Optional traffic inspector** — local dashboard on loopback to browse captures, replay requests, modify and pick a theme (see below).
-
----
-
-## Requirements
-
-- **Node.js 18+**
-- Your app listening on a port (e.g. `8080`)
-- A **tunnel server** reachable from your machine (default: `localhost:9000`)
 
 ---
 
@@ -129,7 +152,7 @@ server.listen(PORT, async () => {
   });
 
   // console.log("Public:", url);
-  // Open the Inspector URL from stderr in a browser (e.g. http://127.0.0.1:4040)
+  // Open the Inspector URL from stderr in a browser (e.g. http://localhost:4040)
 
   process.once("SIGINT", () => {
     stop();
@@ -204,7 +227,7 @@ Errors **reject** the promise — use `try/catch`.
 | `inspector` | `boolean` | `true` | If `true`, start the local traffic inspector UI (see [Traffic inspector](#traffic-inspector-local-dashboard)). If `false`, no extra HTTP server and no Inspector line in the banner. |
 | `themes` | `string` | `'dark'` | Inspector palette: `'dark'`, `'terminal'`, or `'light'`. |
 | `logs` | `number` | `100` | Maximum number of request/response captures kept in memory for the inspector. |
-| `inspectorAddr` | `string` | `':4040'` | Listen address for the inspector (e.g. `':4040'`, `'127.0.0.1:9090'`). Display URL follows the same rules as the public banner. |
+| `inspectorAddr` | `string` | `':4040'` | Listen address for the inspector (e.g. `':4040'`, `'localhost:9090'`). Display URL follows the same rules as the public banner. |
 
 ---
 
