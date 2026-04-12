@@ -18,19 +18,24 @@
  */
 
 import { newTunnel } from '../../internal/tunnel/tunnel.js';
+import { inspectorHTTPBaseURL } from '../../internal/tunnel/inspector.js';
 
 /**
  * Print a formatted success message for the tunnel.
  * @param {string} publicURL
  * @param {string} localURL
+ * @param {string} [inspectorURL] when empty, inspector line is omitted
  */
-function printSuccess(publicURL, localURL) {
+function printSuccess(publicURL, localURL, inspectorURL) {
   console.log();
   console.log('  ╔══════════════════════════════════════════════════╗');
   console.log('  ║  🚇  nodetunnel — tunnel is live                 ║');
   console.log('  ╠══════════════════════════════════════════════════╣');
   console.log(`  ║  🌍  Public   →  ${publicURL.padEnd(32)}║`);
   console.log(`  ║  💻  Local    →  ${localURL.padEnd(32)}║`);
+  if (inspectorURL) {
+    console.log(`  ║  🔍  Inspector → ${inspectorURL.padEnd(32)}║`);
+  }
   console.log(`  ╠══════════════════════════════════════════════════╣`);
   console.log('  ║  ⚡  Forwarding requests...                      ║');
   console.log('  ║  🛑  Press Ctrl+C to stop                        ║');
@@ -42,7 +47,14 @@ function printSuccess(publicURL, localURL) {
  * Connect to the tunnel server and forward public HTTP traffic to localhost:<port>.
  *
  * @param {string} port local port (e.g. "8080")
- * @param {{ host?: string, serverPort?: number }} [options] tunnel server (default localhost:9000)
+ * @param {{
+ *   host?: string,
+ *   serverPort?: number,
+ *   inspector?: boolean,
+ *   themes?: 'dark' | 'terminal' | 'light' | string,
+ *   logs?: number,
+ *   inspectorAddr?: string,
+ * }} [options]
  * @returns {Promise<{ url: string, stop: () => void }>}
  */
 async function startTunnel(port, options) {
@@ -50,7 +62,9 @@ async function startTunnel(port, options) {
 
   const publicURL = tunnel.getPublicUrl();
   const localURL = `http://localhost:${port}`;
-  printSuccess(publicURL, localURL);
+  const insp =
+    tunnel.options.inspector === false ? '' : inspectorHTTPBaseURL(tunnel.options);
+  printSuccess(publicURL, localURL, insp);
 
   return {
     url: publicURL,

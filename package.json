@@ -49,7 +49,7 @@
     "prepublishOnly": "node -e \"import('./pkg/tunnel/tunnel.js').then(() => console.log('pack ok')).catch(e => { console.error(e); process.exit(1); })\""
   },
   "dependencies": {
-    "@dpkrn/nodetunnel": "^1.0.2",
+    "ws": "^8.18.0",
     "yamux-js": "^0.2.0"
   },
   "devDependencies": {

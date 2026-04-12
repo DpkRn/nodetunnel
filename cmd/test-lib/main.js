@@ -1,5 +1,5 @@
 import express from "express";
-import { startTunnel } from "@dpkrn/nodetunnel";
+import { startTunnel } from "../../pkg/tunnel/tunnel.js";
 
 
 const app = express();
@@ -27,7 +27,7 @@ app.get("/", async (req, res) => {
 });
 
 app.listen(PORT, async () => {
-  console.log(`listening on http://127.0.0.1:${PORT}`);
+  console.log(`listening on http://localhost:${PORT}`);
   try {
     const { url, stop } = await startTunnel(String(PORT));
     process.once("SIGINT", () => {

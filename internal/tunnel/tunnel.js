@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { Session } from 'yamux-js/lib/session.js';
+import { addLog, newLogId, setMaxRequestLogs } from './logstore.js';
+import { startInspector } from './inspector.js';
 // import { version } from '../../../package.json' with { type: 'json' };
 
 const defaultMuxConfig = {
@@ -98,6 +100,7 @@ function headersToObject(h) {
  * @param {string} port
  */
 async function handleStream(stream, port) {
+  const started = Date.now();
   try {
     const line = await readJsonLine(stream);
     let req;
@@ -135,6 +138,19 @@ async function handleStream(stream, port) {
     };
 
     stream.end(Buffer.from(`${JSON.stringify(payload)}\n`, 'utf8'));
+
+    addLog({
+      id: newLogId(),
+      method,
+      path,
+      headers: raw,
+      body: body.toString('utf8'),
+      status: resp.status,
+      resp_body: respBody.toString('utf8'),
+      resp_headers: headersToObject(resp.headers),
+      timestamp: new Date().toISOString(),
+      duration_ms: Date.now() - started,
+    });
   } catch (e) {
     try {
       stream.destroy();
@@ -146,17 +162,52 @@ async function handleStream(stream, port) {
 
 /**
  * @typedef {Object} TunnelOptions
- * @property {string} [host] tunnel server host (default localhost)
+ * @property {string} [host] tunnel server host (default clickly.cv)
  * @property {number} [serverPort] tunnel server TCP port (default 9000)
+ * @property {boolean} [inspector] traffic inspector UI (default true)
+ * @property {string} [themes] inspector palette: "dark" | "terminal" | "light"
+ * @property {number} [logs] max request logs in memory (default 100)
+ * @property {string} [inspectorAddr] inspector listen address (default ":4040")
  */
+
+function defaultTunnelOptions() {
+  return {
+    host: 'clickly.cv',
+    serverPort: 9000,
+    inspector: true,
+    themes: 'dark',
+    logs: 100,
+    inspectorAddr: '',
+  };
+}
+
+/**
+ * @param {TunnelOptions | undefined} options
+ * @returns {TunnelOptions & ReturnType<typeof defaultTunnelOptions>}
+ */
+function applyTunnelOptions(options) {
+  const d = defaultTunnelOptions();
+  if (!options || typeof options !== 'object') {
+    return /** @type {TunnelOptions & typeof d} */ ({ ...d });
+  }
+  return {
+    host: options.host ?? d.host,
+    serverPort: options.serverPort ?? d.serverPort,
+    inspector: options.inspector !== undefined ? !!options.inspector : d.inspector,
+    themes: options.themes ?? d.themes,
+    logs: options.logs > 0 ? options.logs : d.logs,
+    inspectorAddr: options.inspectorAddr ?? d.inspectorAddr,
+  };
+}
 
 class Tunnel {
   /**
    * @param {string} localPort local HTTP port to forward to
-   * @param {TunnelOptions} [options]
+   * @param {TunnelOptions} [options] merged options
    */
   constructor(localPort, options = {}) {
     this.localPort = localPort;
+    this.options = options;
     this.serverHost = options.host ?? 'clickly.cv';
     this.serverPort = options.serverPort ?? 9000;
     /** @type {import('net').Socket | null} */
@@ -165,6 +216,8 @@ class Tunnel {
     this.session = null;
     this.publicUrl = '';
     this._stopped = false;
+    /** @type {(() => void) | null} */
+    this._stopInspector = null;
   }
 
   /**
@@ -218,6 +271,14 @@ class Tunnel {
     if (this._stopped) return;
     this._stopped = true;
     try {
+      if (this._stopInspector) {
+        this._stopInspector();
+        this._stopInspector = null;
+      }
+    } catch {
+      /* ignore */
+    }
+    try {
       if (this.session) {
         this.session.close();
         this.session = null;
@@ -241,8 +302,11 @@ class Tunnel {
  * @param {TunnelOptions} [options]
  */
 async function newTunnel(localPort, options) {
-  const t = new Tunnel(localPort, options);
+  const opts = applyTunnelOptions(options);
+  setMaxRequestLogs(opts.logs);
+  const t = new Tunnel(localPort, opts);
   await t.connect();
+  t._stopInspector = startInspector(opts, localPort);
   return t;
 }
 
