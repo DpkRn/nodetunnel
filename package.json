@@ -1,6 +1,6 @@
 {
   "name": "@dpkrn/nodetunnel",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Expose a local HTTP server through a devtunnel/gotunnel-compatible server (yamux + JSON). Node.js 18+.",
   "keywords": [
     "tunnel",
