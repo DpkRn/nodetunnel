@@ -58,6 +58,19 @@ export function getLogs() {
 }
 
 /**
+ * @param {string} id
+ * @returns {Record<string, unknown> | null}
+ */
+export function getLogById(id) {
+  const want = String(id);
+  for (let i = requestLogs.length - 1; i >= 0; i--) {
+    const e = requestLogs[i];
+    if (e && String(/** @type {{ id?: string }} */ (e).id) === want) return e;
+  }
+  return null;
+}
+
+/**
  * @returns {string}
  */
 export function newLogId() {

@@ -140,16 +140,19 @@ async function handleStream(stream, port) {
     stream.end(Buffer.from(`${JSON.stringify(payload)}\n`, 'utf8'));
 
     addLog({
-      id: newLogId(),
-      method,
-      path,
-      headers: raw,
-      body: body.toString('utf8'),
-      status: resp.status,
-      resp_body: respBody.toString('utf8'),
-      resp_headers: headersToObject(resp.headers),
-      timestamp: new Date().toISOString(),
-      duration_ms: Date.now() - started,
+      id: `req_${newLogId()}`,
+      request: {
+        method,
+        path,
+        headers: raw,
+        body: body.length ? body.toString('base64') : '',
+      },
+      response: {
+        statusCode: resp.status,
+        headers: headersToObject(resp.headers),
+        body: respBody.length ? respBody.toString('base64') : '',
+      },
+      durationMs: Date.now() - started,
     });
   } catch (e) {
     try {
