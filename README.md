@@ -16,7 +16,7 @@ From **Node.js**, you get a **public URL** for webhooks, demos, sharing a dev se
 - No port forwarding or firewall configuration needed
 - Works behind NAT or private networks
 - Simple integration with existing Node.js HTTP servers (Express, Fastify, plain `http`, etc.)
-- Traffic inspector: capture traffic, replay, and modify requests as many times as you need
+- Optional **traffic inspector**: local dashboard to capture tunneled requests, inspect them, and replay against your app
 
 Incoming traffic reaches the public URL, is forwarded through the tunnel, and is proxied to your local HTTP server (e.g., `localhost:8080`).
 
@@ -40,7 +40,7 @@ This enables exposing local development servers without port forwarding, firewal
 - **No separate tunnel process** — call one function from your app.
 - **Works with your existing server** — Express, Fastify, or plain `http`.
 - **Simple API** — you get a public `url` and a `stop()` when you are done.
-- **Optional traffic inspector** — local dashboard on loopback to browse captures, replay requests, modify and pick a theme (see below).
+- **Optional traffic inspector** — pass `inspector: true` to start a local HTTP UI on loopback (captures, replay, headers/bodies). By default the inspector is **off**. Themes are chosen **inside the inspector UI** (not via `startTunnel` options).
 
 ---
 
@@ -53,8 +53,6 @@ npm install @dpkrn/nodetunnel
 This package is **ESM** (`import` / `export`).
 
 ---
-
-
 
 ## Quick Example
 
@@ -69,8 +67,8 @@ app.get("/", (req, res) => res.send("OK"));
 
 app.listen(PORT, async () => {
   const { url, stop } = await startTunnel(String(PORT));
-  //url is your public url using you can access publicly your server
-  //stop() is method that will close your connection on error
+  // `url` — public URL for your server
+  // `stop()` — closes the tunnel connection
 });
 ```
 
@@ -107,29 +105,33 @@ Run with `node app.js`. Open the printed URL in a browser or share it for webhoo
 
 ---
 
-## Traffic inspector (local dashboard)
+## Traffic inspector (optional local dashboard)
 
-When enabled (default), nodetunnel starts a small **HTTP server on your machine** (default `http://localhost:4040`) with:
+**Default:** `inspector` is **`false`** if you omit options or do not set `inspector`. No inspector server, no capture buffer, no extra listen port.
 
-- **Live traffic** — requests proxied through the tunnel appear in the UI (WebSocket updates).
-- **History** — recent captures kept in memory (configurable count); reload the page to fetch `/logs`.
-- **Inspect** — request/response headers and bodies for each capture.
-- **Modify** — modify request header/path and can replay.
-- **Replay** — send a capture again to your local app, or edit method/path/headers/body and replay (aligned with the **gotunnel** inspector behavior).
+When **`inspector: true`**:
 
-The startup banner prints **Inspector →** with that URL. Set `inspector: false` if you do not want the UI or an extra listen port.
+1. Starts a small **HTTP server on your machine** (default listen **`http://127.0.0.1:4040`**) that serves the inspector UI (override with `inspectorAddr`).
+2. **Captures** each tunneled request/response in memory (up to **`logs`** entries) so the UI can list them and push updates over WebSocket.
 
-### Themes
+When **`inspector` stays false** (the default):
 
-The UI supports three built-in palettes via `themes` in `startTunnel` options:
+- No inspector process runs — nothing listens on the inspector port.
+- No traffic is stored for inspection (`logs` and `inspectorAddr` are ignored).
+- The startup banner omits the **Inspector →** line.
 
-| Value | Appearance |
-|--------|----------------|
-| **`"dark"`** (default) | Dark panels, blue accents — similar to GitHub-dark style. |
-| **`"terminal"`** | Green-on-black “CRT” / terminal aesthetic, monospace UI font. |
-| **`"light"`** | Light gray/white background, high-contrast text for bright environments. |
+### What you get with the inspector enabled
 
-### Example: themes and inspector options
+- **Live traffic** — tunneled requests appear in the UI (WebSocket updates).
+- **History** — recent captures in memory (size limited by `logs`).
+- **Inspect** — request/response headers and bodies (when captured).
+- **Replay** — send a capture again to your local app, or edit method/path/headers/body and replay.
+
+### Themes (inspector UI only)
+
+Postman-style and Terminal-style palettes are available from the **Theme** dropdown in the inspector page; the choice is stored in the browser (localStorage). You do **not** configure themes on `startTunnel`.
+
+### Example: inspector enabled with custom port and log limit
 
 ```js
 import http from "node:http";
@@ -144,15 +146,10 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, async () => {
   const { url, stop } = await startTunnel(String(PORT), {
-    // Inspector (defaults: enabled, :4040, dark theme, 100 logs)
     inspector: true,
     inspectorAddr: ":4040",
-    themes: "terminal", // try: "dark" | "terminal" | "light"
     logs: 100,
   });
-
-  // console.log("Public:", url);
-  // Open the Inspector URL from stderr in a browser (e.g. http://localhost:4040)
 
   process.once("SIGINT", () => {
     stop();
@@ -161,14 +158,14 @@ server.listen(PORT, async () => {
 });
 ```
 
-### Example: tunnel only (no inspector)
+Open the **Inspector →** URL printed on startup (e.g. `http://127.0.0.1:4040`).
+
+### Example: tunnel only (default — same as omitting options)
+
+`startTunnel(port)` / `startTunnel(port, {})` already keeps the inspector off. You only need `inspector: false` if you merge options from elsewhere and want to force it off:
 
 ```js
-import { startTunnel } from "@dpkrn/nodetunnel";
-
-const { url, stop } = await startTunnel("8080", {
-  inspector: false,
-});
+const { url, stop } = await startTunnel("8080"); // no inspector
 ```
 
 ---
@@ -207,27 +204,26 @@ app.listen(PORT, async () => {
 | Argument | Description |
 |----------|-------------|
 | `port` | String, e.g. `"8080"` — must match the port your HTTP server uses. |
-| `options` | Optional. Object — see **Options** below (tunnel server address, inspector, themes, etc.). |
+| `options` | Optional. See **Options** below. |
 
 **Returns:** `{ url, stop }`
 
 | Field | Description |
 |-------|-------------|
 | `url` | Public URL people can hit. |
-| `stop` | Call to tear down the tunnel. |
+| `stop` | Call to tear down the tunnel (and the inspector, if it was started). |
 
 Errors **reject** the promise — use `try/catch`.
 
 ### Options (`startTunnel` second argument)
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `host` | `string` | `'clickly.cv'` | Hostname of the tunnel **control** server. |
-| `serverPort` | `number` | `9000` | TCP port of the tunnel server. |
-| `inspector` | `boolean` | `true` | If `true`, start the local traffic inspector UI (see [Traffic inspector](#traffic-inspector-local-dashboard)). If `false`, no extra HTTP server and no Inspector line in the banner. |
-| `themes` | `string` | `'dark'` | Inspector palette: `'dark'`, `'terminal'`, or `'light'`. |
-| `logs` | `number` | `100` | Maximum number of request/response captures kept in memory for the inspector. |
-| `inspectorAddr` | `string` | `':4040'` | Listen address for the inspector (e.g. `':4040'`, `'localhost:9090'`). Display URL follows the same rules as the public banner. |
+| Field | Type | Default | Applies when |
+|-------|------|---------|----------------|
+| `host` | `string` | `'clickly.cv'` | Always — tunnel control server hostname. |
+| `serverPort` | `number` | `9000` | Always — TCP port of the tunnel server. |
+| `inspector` | `boolean` | `false` | Always — if `false` (default), no inspector UI, no capture store, and inspector-only options below are ignored. Set `true` to enable the local inspector. |
+| `logs` | `number` | `100` | **`inspector: true` only** — max request/response captures kept in memory. |
+| `inspectorAddr` | `string` | `':4040'` | **`inspector: true` only** — listen address for the inspector (e.g. `':4040'`, `'localhost:9090'`). |
 
 ---
 

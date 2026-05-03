@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { Session } from 'yamux-js/lib/session.js';
-import { addLog, newLogId, setMaxRequestLogs } from '../inspector/logstore.js';
+import {
+  addLog,
+  newLogId,
+  setMaxRequestLogs,
+  setTrafficCaptureEnabled,
+} from '../inspector/logstore.js';
 import { startInspector } from '../inspector/inspector.js';
 // import { version } from '../../../package.json' with { type: 'json' };
 
@@ -167,18 +172,17 @@ async function handleStream(stream, port) {
  * @typedef {Object} TunnelOptions
  * @property {string} [host] tunnel server host (default clickly.cv)
  * @property {number} [serverPort] tunnel server TCP port (default 9000)
- * @property {boolean} [inspector] traffic inspector UI (default true)
- * @property {string} [themes] inspector palette: "dark" | "terminal" | "light"
- * @property {number} [logs] max request logs in memory (default 100)
- * @property {string} [inspectorAddr] inspector listen address (default ":4040")
+ * @property {boolean} [inspector] traffic inspector UI (default false). When false, no inspector server, no in-memory traffic capture, and `logs` / `inspectorAddr` are ignored.
+ * @property {number} [logs] max request/response captures in memory for the inspector (default 100). Only used when `inspector` is true.
+ * @property {string} [inspectorAddr] inspector listen address (default ":4040"). Only used when `inspector` is true.
  */
 
 function defaultTunnelOptions() {
   return {
     host: 'clickly.cv',
     serverPort: 9000,
-    inspector: true,
-    themes: 'dark',
+    themes: 'terminal',
+    inspector: false,
     logs: 100,
     inspectorAddr: '',
   };
@@ -193,13 +197,15 @@ function applyTunnelOptions(options) {
   if (!options || typeof options !== 'object') {
     return /** @type {TunnelOptions & typeof d} */ ({ ...d });
   }
+  const inspector =
+    options.inspector !== undefined ? !!options.inspector : d.inspector;
   return {
     host: options.host ?? d.host,
     serverPort: options.serverPort ?? d.serverPort,
-    inspector: options.inspector !== undefined ? !!options.inspector : d.inspector,
-    themes: options.themes ?? d.themes,
-    logs: options.logs > 0 ? options.logs : d.logs,
-    inspectorAddr: options.inspectorAddr ?? d.inspectorAddr,
+    inspector,
+    logs:
+      inspector && options.logs > 0 ? options.logs : d.logs,
+    inspectorAddr: inspector ? (options.inspectorAddr ?? d.inspectorAddr) : d.inspectorAddr,
   };
 }
 
@@ -306,7 +312,10 @@ class Tunnel {
  */
 async function newTunnel(localPort, options) {
   const opts = applyTunnelOptions(options);
-  setMaxRequestLogs(opts.logs);
+  setTrafficCaptureEnabled(opts.inspector);
+  if (opts.inspector) {
+    setMaxRequestLogs(opts.logs);
+  }
   const t = new Tunnel(localPort, opts);
   await t.connect();
   t._stopInspector = startInspector(opts, localPort);
