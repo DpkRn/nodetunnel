@@ -263,7 +263,6 @@ function createReplayHandler() {
     let p;
     try {
       p = JSON.parse(raw.toString('utf8'));
-      console.log("p",p);
     } catch (e) {
       res.setHeader('Content-Type', 'application/json');
       res.writeHead(400);
@@ -282,7 +281,6 @@ function createReplayHandler() {
     if (!method) method = 'GET';
 
     const localhostUrl = String(p.url ?? '').trim();
-    console.log("localhostUrl",localhostUrl);
     let u;
     try {
       u = new URL(localhostUrl);
