@@ -18,7 +18,7 @@
  */
 
 import { newTunnel } from '../../internal/tunnel/tunnel.js';
-import { inspectorHTTPBaseURL } from '../../internal/tunnel/inspector.js';
+import { inspectorHTTPBaseURL } from '../../internal/inspector/inspector.js';
 
 /**
  * Print a formatted success message for the tunnel.

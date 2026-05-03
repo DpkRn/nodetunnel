@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { Session } from 'yamux-js/lib/session.js';
-import { addLog, newLogId, setMaxRequestLogs } from './logstore.js';
-import { startInspector } from './inspector.js';
+import { addLog, newLogId, setMaxRequestLogs } from '../inspector/logstore.js';
+import { startInspector } from '../inspector/inspector.js';
 // import { version } from '../../../package.json' with { type: 'json' };
 
 const defaultMuxConfig = {

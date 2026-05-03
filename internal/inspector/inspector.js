@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { request } from 'undici';
 import { WebSocketServer } from 'ws';
 import { getLogs, getLogById, setInspectorSubscriber, addLog } from './logstore.js';
 
@@ -19,8 +20,10 @@ const defaultInspectorAddr = ':4040';
 /** Same header as gotunnel inspector. */
 const HeaderLogReplay = 'X-Inspector-Log-Replay';
 
+/** Dropped on replay so upstream length matches the body we send (stale Content-Length breaks POST JSON). */
 const replayHeaderBlocklist = new Set([
   'connection',
+  'content-length',
   'keep-alive',
   'proxy-authenticate',
   'proxy-authorization',
@@ -90,15 +93,99 @@ function pathForReplayLog(u) {
   return u.search ? `${p}${u.search}` : p;
 }
 
-/** @param {Headers} h */
-function headersObjectFromFetch(h) {
+/** @param {import('undici').IncomingHttpHeaders} h */
+function headersObjectFromUndici(h) {
   /** @type {Record<string, string[]>} */
   const out = {};
-  h.forEach((value, key) => {
-    if (!out[key]) out[key] = [];
-    out[key].push(value);
-  });
+  if (!h || typeof h !== 'object') return out;
+  for (const [k, v] of Object.entries(h)) {
+    if (v == null) continue;
+    if (Array.isArray(v)) out[k] = v.map((x) => String(x));
+    else out[k] = [String(v)];
+  }
   return out;
+}
+
+/** @param {unknown} body */
+function normalizeReplayBody(body) {
+  if (body == null || body === '') return '';
+  if (typeof body === 'string') return body;
+  if (typeof body === 'object' && body !== null && !Buffer.isBuffer(body)) {
+    try {
+      return JSON.stringify(body);
+    } catch {
+      return String(body);
+    }
+  }
+  return String(body);
+}
+
+/**
+ * Headers for the upstream fetch (no hop-by-hop / wrong length).
+ * @param {Record<string, unknown>} h from replay JSON
+ */
+function buildUpstreamHeaders(h) {
+  /** @type {Record<string, string | string[]>} */
+  const out = {};
+  const src = h && typeof h === 'object' ? h : {};
+  for (const [k, vals] of Object.entries(src)) {
+    if (replayHeaderBlocklist.has(k.toLowerCase())) continue;
+    const arr = Array.isArray(vals) ? vals : [vals];
+    const strs = arr.filter((v) => v != null).map((v) => String(v));
+    if (!strs.length) continue;
+    out[k] = strs.length === 1 ? strs[0] : strs;
+  }
+  return out;
+}
+
+/**
+ * Express (and many servers) only parse JSON bodies when Content-Type is JSON.
+ * Captured replays often omit Content-Type or keep a wrong type (e.g. GET capture).
+ * @param {Record<string, string | string[]>} headers
+ * @param {string} method
+ * @param {string} bodyStr
+ */
+function finalizeUpstreamContentType(headers, method, bodyStr) {
+  if (!bodyStr.length || method === 'GET' || method === 'HEAD') return headers;
+
+  const trimmed = bodyStr.trim();
+  const looksJson =
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'));
+
+  /** @type {Record<string, string | string[]>} */
+  const out = { ...headers };
+  let ctKey = null;
+  for (const k of Object.keys(out)) {
+    if (k.toLowerCase() === 'content-type') {
+      ctKey = k;
+      break;
+    }
+  }
+
+  if (!ctKey) {
+    out['Content-Type'] = looksJson
+      ? 'application/json; charset=utf-8'
+      : 'text/plain; charset=utf-8';
+    return out;
+  }
+
+  const raw = out[ctKey];
+  const ctVal = Array.isArray(raw) ? String(raw[0]) : String(raw);
+  if (looksJson && !ctVal.toLowerCase().includes('json')) {
+    delete out[ctKey];
+    out['Content-Type'] = 'application/json; charset=utf-8';
+  }
+  return out;
+}
+
+/** @param {import('stream').Readable} stream */
+async function readStreamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 /**
@@ -176,6 +263,7 @@ function createReplayHandler() {
     let p;
     try {
       p = JSON.parse(raw.toString('utf8'));
+      console.log("p",p);
     } catch (e) {
       res.setHeader('Content-Type', 'application/json');
       res.writeHead(400);
@@ -193,10 +281,11 @@ function createReplayHandler() {
       .toUpperCase();
     if (!method) method = 'GET';
 
-    const urlStr = String(p.url ?? '').trim();
+    const localhostUrl = String(p.url ?? '').trim();
+    console.log("localhostUrl",localhostUrl);
     let u;
     try {
-      u = new URL(urlStr);
+      u = new URL(localhostUrl);
     } catch {
       res.setHeader('Content-Type', 'application/json');
       res.writeHead(400);
@@ -216,22 +305,13 @@ function createReplayHandler() {
       return;
     }
 
-    const headers = new Headers();
     const h = p.headers && typeof p.headers === 'object' ? p.headers : {};
-    for (const [k, vals] of Object.entries(h)) {
-      if (replayHeaderBlocklist.has(k.toLowerCase())) continue;
-      const arr = Array.isArray(vals) ? vals : [vals];
-      for (const v of arr) {
-        if (v != null) headers.append(k, String(v));
-      }
-    }
-
-    const bodyStr = p.body != null ? String(p.body) : '';
-    /** @type {{ method: string; headers: Headers; body?: string; signal?: AbortSignal }} */
-    const init = { method, headers };
-    if (bodyStr.length > 0 && method !== 'GET' && method !== 'HEAD') {
-      init.body = bodyStr;
-    }
+    const bodyStr = normalizeReplayBody(p.body);
+    const upstreamHeaders = finalizeUpstreamContentType(
+      buildUpstreamHeaders(h),
+      method,
+      bodyStr,
+    );
 
     const start = Date.now();
     const ac = new AbortController();
@@ -239,18 +319,41 @@ function createReplayHandler() {
 
     res.setHeader('Content-Type', 'application/json');
 
+    /** @type {import('undici').RequestOptions} */
+    const reqOpts = {
+      method,
+      headers: upstreamHeaders,
+      signal: ac.signal,
+    };
+    if (bodyStr.length > 0 && method !== 'GET' && method !== 'HEAD') {
+      reqOpts.body = bodyStr;
+    }
+
     try {
-      const resp = await fetch(urlStr, { ...init, signal: ac.signal });
+      const { statusCode, headers: respHdrs, body: respStream } = await request(
+        localhostUrl,
+        reqOpts,
+      );
       clearTimeout(to);
       const dur = Date.now() - start;
-      const b = Buffer.from(await resp.arrayBuffer());
+      const b = await readStreamToBuffer(respStream);
       const slice = b.length > 10 << 20 ? b.subarray(0, 10 << 20) : b;
-      const headersOut = headersObjectFromFetch(resp.headers);
-      recordReplay(logReplay, method, u, cloneHeaderMap(h), bodyStr, resp.status, headersOut, slice, dur);
+      const headersOut = headersObjectFromUndici(respHdrs);
+      recordReplay(
+        logReplay,
+        method,
+        u,
+        cloneHeaderMap(h),
+        bodyStr,
+        statusCode,
+        headersOut,
+        slice,
+        dur,
+      );
       res.writeHead(200);
       res.end(
         JSON.stringify({
-          statusCode: resp.status,
+          statusCode,
           headers: headersOut,
           body: slice.toString('base64'),
           durationMs: dur,
@@ -384,7 +487,7 @@ export function startInspector(opts, localPort) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache');
       const page = inspectorHTML
-        .replace(/__LOCAL_APP_PORT__/g, localAppPort)
+        .replace(/__NT_PORT_VALUE__/g, localAppPort)
         .replace(/__THEME_SEED__/g, themeSeed);
       res.end(page);
       return;

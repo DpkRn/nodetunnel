@@ -32,6 +32,8 @@ app.get("/", async (req, res) => {
  * Example: POST /test/widgets/42?verbose=1&tag=a with body `{"name":"x"}`
  */
 app.post("/test/:category/:itemId", (req, res) => {
+  console.log("server received request");
+  console.log("req.body",req.body);
   res.status(200).json({
     pathParams: req.params,
     query: req.query,
