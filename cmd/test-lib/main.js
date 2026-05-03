@@ -44,7 +44,11 @@ app.post("/test/:category/:itemId", (req, res) => {
 app.listen(PORT, async () => {
   console.log(`listening on http://localhost:${PORT}`);
   try {
-    const { url, stop } = await startTunnel(String(PORT));
+    const { url, stop } = await startTunnel(String(PORT),{
+      inspector: true,
+      inspectorAddr: ':5040',
+      logs: 100,
+    });
     process.once("SIGINT", () => {
       stop();
       process.exit(0);

@@ -51,10 +51,9 @@ function printSuccess(publicURL, localURL, inspectorURL) {
  *   host?: string,
  *   serverPort?: number,
  *   inspector?: boolean,
- *   themes?: 'dark' | 'terminal' | 'light' | string,
  *   logs?: number,
  *   inspectorAddr?: string,
- * }} [options]
+ * }} [options] Omit or leave defaults for tunnel-only (`inspector` defaults to false).
  * @returns {Promise<{ url: string, stop: () => void }>}
  */
 async function startTunnel(port, options) {

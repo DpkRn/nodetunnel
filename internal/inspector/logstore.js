@@ -10,12 +10,22 @@ let requestLogs = [];
 /** @type {((entry: Record<string, unknown>) => void) | null} */
 let inspectorSubscriber = null;
 
+/** When false (tunnel started with `inspector: false`), captures are not stored. */
+let trafficCaptureEnabled = true;
+
 /**
  * Wire live inspector WebSocket broadcast (optional).
  * @param {((entry: Record<string, unknown>) => void) | null} fn
  */
 export function setInspectorSubscriber(fn) {
   inspectorSubscriber = fn;
+}
+
+/**
+ * @param {boolean} enabled
+ */
+export function setTrafficCaptureEnabled(enabled) {
+  trafficCaptureEnabled = !!enabled;
 }
 
 /**
@@ -33,6 +43,7 @@ export function setMaxRequestLogs(n) {
  * @param {Record<string, unknown>} entry
  */
 export function addLog(entry) {
+  if (!trafficCaptureEnabled) return;
   requestLogs.push(entry);
   if (requestLogs.length > maxRequestLogs) {
     requestLogs = requestLogs.slice(requestLogs.length - maxRequestLogs);

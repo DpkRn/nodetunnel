@@ -43,13 +43,9 @@ export function inspectorHTTPBaseURL(opts) {
   return `http://${addr}`;
 }
 
-/** @param {string | undefined} themes */
-function themeSeedFromOpts(themes) {
-  const t = String(themes ?? '')
-    .trim()
-    .toLowerCase();
-  if (t === 'terminal') return 'terminal';
-  return 'postman';
+/** Default HTML theme before localStorage applies (UI also has a theme switcher). */
+function defaultInspectorThemeSeed() {
+  return 'terminal';
 }
 
 /** @param {string} host */
@@ -409,7 +405,7 @@ function parseListenAddr(addr) {
 }
 
 /**
- * @param {{ inspector?: boolean; themes?: string; inspectorAddr?: string }} opts
+ * @param {{ inspector?: boolean; inspectorAddr?: string }} opts
  * @param {string} localPort digits — forwarded app port for default replay base in UI
  * @returns {() => void}
  */
@@ -418,7 +414,7 @@ export function startInspector(opts, localPort) {
     return () => {};
   }
 
-  const themeSeed = themeSeedFromOpts(opts.themes);
+  const themeSeed = defaultInspectorThemeSeed();
   let addr = String(opts.inspectorAddr ?? '').trim();
   if (!addr) addr = defaultInspectorAddr;
 
